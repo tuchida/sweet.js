@@ -396,23 +396,23 @@
         // destructed.
         // () -> [...Syntax]
         destruct: function() {
-            return _.reduce(this.properties, _.bind(function(acc, prop) {
+            return flatMap(this.properties, _.bind(function(prop) {
                 if (this[prop] && this[prop].hasPrototype(TermTree)) {
-                    return acc.concat(this[prop].destruct());
+                    return this[prop].destruct();
                 } else if (this[prop] && this[prop].token && this[prop].token.inner) {
-                    this[prop].token.inner = _.reduce(this[prop].token.inner, function(acc, t) {
+                    this[prop].token.inner = flatMap(this[prop].token.inner, function(t) {
                         if (t.hasPrototype(TermTree)) {
-                            return acc.concat(t.destruct());
+                            return t.destruct();
                         }
-                        return acc.concat(t);
+                        return t;
                     }, []);
-                    return acc.concat(this[prop]);
+                    return this[prop];
                 } else if(this[prop]) {
-                    return acc.concat(this[prop]);
+                    return this[prop];
                 } else {
-                    return acc;
+                    return [];
                 }
-            }, this), []);
+            }, this));
         }
     };
 
@@ -658,9 +658,9 @@
         destruct: function() {
             return this.varkw
                 .destruct()
-                .concat(_.reduce(this.decls, function(acc, decl) {
-                    return acc.concat(decl.destruct());
-                }, []));
+                .concat(flatMap(this.decls, function(decl) {
+                    return decl.destruct();
+                }));
         },
 
         construct: function(varkw, decls) {
@@ -1545,7 +1545,7 @@
 
     // break delimiter tree structure down to flat array of syntax objects
     function flatten(stx) {
-        return _.reduce(stx, function(acc, stx) {
+        return flatMap(stx, function(stx) {
             if (stx.token.type === parser.Token.Delimiter) {
                 var exposed = stx.expose();
                 var openParen = syntaxFromToken({
@@ -1580,10 +1580,7 @@
                 if (stx.token.trailingComments) {
                     openParen.token.trailingComments = stx.token.trailingComments;
                 }
-                return acc
-                    .concat(openParen)
-                    .concat(flatten(exposed.token.inner))
-                    .concat(closeParen);
+                return [openParen, flatten(exposed.token.inner), closeParen];
             }
             stx.token.sm_lineNumber = stx.token.sm_lineNumber 
                                     ? stx.token.sm_lineNumber 
@@ -1591,8 +1588,28 @@
             stx.token.sm_lineStart = stx.token.sm_lineStart 
                                     ? stx.token.sm_lineStart 
                                     : stx.token.lineStart;
-            return acc.concat(stx);
-        }, []);
+            return stx;
+        });
+    }
+
+    function flatMap(arr, fn) {
+        var ret = [];
+        for (var i = 0, ilen = arr.length; i < ilen; i++) {
+            var v = fn(arr[i]);
+            if (!Array.isArray(v)) {
+                ret.push(v);
+            } else {
+                for (var j = 0, jlen = v.length; j < jlen; j++) {
+                    var e = v[j];
+                    if (Array.isArray(e)) {
+                        [].push.apply(ret, e);
+                    } else {
+                        ret.push(e);
+                    }
+                }
+            }
+        }
+        return ret;
     }
 
     exports.enforest = enforest;
