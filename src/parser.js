@@ -5524,6 +5524,21 @@ parseYieldExpression: true
 
         function _advance() { return attachComments(advance()); }
         function _scanRegExp() { return attachComments(scanRegExp()); }
+        function _scanTemplate() {
+            var tmp, quasi, t;
+            tmp = scanTemplate();
+            while (!tmp.tail) {
+                quasi = readToken(toks, true, false);
+                tmp.value.cooked += '${' + quasi.value + '}';
+                tmp.value.raw += '${' + quasi.value + '}';
+                t = scanTemplateElement({ head: false });
+                tmp.tail = t.tail;
+                tmp.value.cooked += t.value.cooked;
+                tmp.value.raw += t.value.raw;
+                tmp.range[1] = t.range[1];
+            }
+            return tmp;
+          }
         
         skipComment();
 
@@ -5534,6 +5549,10 @@ parseYieldExpression: true
         if (isIn(source[index], delimiters)) {
             return attachComments(readDelim(toks, inExprDelim, parentIsBlock));
         } 
+
+        if (source[index] === '`') {
+            return _scanTemplate();
+        }
 
         if (source[index] === "/") {
             var prev = back(1);
